@@ -1,0 +1,9 @@
+[meta]
+name        = "[POC] Medal.tv Clip"
+author      = "cosmatic"
+category    = "clipping"
+
+version = "1.0"
+
+[script]
+dependencies = [ "VehicleState" ]
