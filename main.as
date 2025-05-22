@@ -4,19 +4,24 @@
 // https://github.com/RuurdBijlsma/tm-split-speeds
 
 void Main() {
-    Request@ req = Request('http://localhost:12665/api/v1/context/submit', '', {});
+    // allow the program to check for medal until a connection can be made
+    while (true) {
 
-    print("Checking if Medal is active");
-    print('Waiting for Medal...');
-    sleep(1000);
+        Request@ req = Request('http://localhost:12665/api/v1/context/submit', '', {});
 
-    if (req.req.Finished()) {
-        print('Medal is active and ready to go');
-    } else {
-        print('Medal is offline! Your clips will not work');
+        print("Checking if Medal is active");
+        print('Waiting for Medal...');
+        sleep(1000);
+
+        if (req.req.Finished()) {
+            print('Medal is active and ready to go');
+            break;
+        } else {
+            print('Medal is offline! Your clips will not work. Retrying in 30 seconds');
+            sleep(1000 * 30);
+        }
     }
 
-    
     Intercept(); //start the process to listen for collected checkpoints
     while (true) {
         auto app = GetApp();
@@ -109,13 +114,6 @@ void Update(float dt) {
     }
 }
 
-void RenderMenu()
-{
-  if (UI::MenuItem("My first menu item!")) {
-    print("You clicked me!!");
-  }
-}
-
 bool trackStart = true; // has the race started
 bool hasFinished = true; // has the race ended 
 bool intercepting = false; // are we watching the checkpoints
@@ -138,10 +136,10 @@ void Intercept() {
     if (GetApp().CurrentPlayground is null)
         return;
 
-    trace("Intercept starting for \"MedalEventDetection\"");
+    trace("Intercept starting for \"LayerCustomEvent\"");
 
     try {
-        Dev::InterceptProc("CGameManiaApp", "MedalEventDetection", _Intercept);
+        Dev::InterceptProc("CGameManiaApp", "LayerCustomEvent", _Intercept);
         intercepting = true;
     } catch {
         warn("Intercept error: " + getExceptionInfo());
