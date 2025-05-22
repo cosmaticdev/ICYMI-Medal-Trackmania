@@ -95,6 +95,8 @@ void Update(float dt) {
             print("Race has started!");
             hasFinished = false;
             checkpoints = 0;
+            isPlayerAFK = false;
+            framesAFK = 0;
             NetStuff('http://localhost:12665/api/v1/event/invoke', '{"eventId": "race_start", "eventName": "Race Started"}');
             // if API functionality is added, this is where the call is made to start recording
         }
@@ -112,6 +114,29 @@ void Update(float dt) {
         NetStuff('http://localhost:12665/api/v1/event/invoke', '{"eventId": "race_finish", "eventName": "Race Finished"}');
         // if API functionality is added, this is where the call is made to stop recording
     }
+
+    // watch player speed to detect AFK
+    auto visState = VehicleState::ViewingPlayerState();
+    if (visState is null) return;
+    
+    if (!hasFinished) {
+        float speed = visState.WorldVel.Length() * 3.6;
+        if (isPlayerAFK && speed > 2) {
+            isPlayerAFK = false;
+            framesAFK = 0;
+            print("Player returned from AFK");
+            NetStuff('http://localhost:12665/api/v1/event/invoke', '{"eventId": "afk_return", "eventName": "Returned from AFK"}');
+            // make call to resume recording
+        } else if (speed < 2) { framesAFK += 1; }
+
+        // 15ish seconds at 60fps
+        if (framesAFK > 60*15 && !isPlayerAFK) { 
+            isPlayerAFK = true;
+            print("Player went AFK");
+            NetStuff('http://localhost:12665/api/v1/event/invoke', '{"eventId": "afk_start", "eventName": "Went AFK"}');
+            // make call to stop recording
+        }
+    }
 }
 
 bool trackStart = true; // has the race started
@@ -125,6 +150,8 @@ uint lastCheckpointTime = 0; // when did we cross the last finish line
 string currentMapId = ""; // what map are we playing right now
 string playerId = "";
 string playerName = "";
+bool isPlayerAFK = false;
+uint framesAFK = 0;
 
 // watches the checkpoints to see if we've crossed any of them
 void Intercept() {
