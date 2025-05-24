@@ -7,22 +7,23 @@ void Main() {
     // allow the program to check for medal until a connection can be made
     while (true) {
 
+        // ping medal's local port
         Request@ req = Request('http://localhost:12665/api/v1/context/submit', '', {});
 
-        print("Checking if Medal is active");
-        print('Waiting for Medal...');
+        trace('Waiting for Medal...');
         sleep(1000);
 
         if (req.req.Finished()) {
-            print('Medal is active and ready to go');
+            trace('Connection made with Medal API');
             break;
         } else {
-            print('Medal is offline! Your clips will not work. Retrying in 30 seconds');
+            warn('Medal is offline! Your clips will not work. Retrying in 30 seconds');
             sleep(1000 * 30);
         }
     }
 
-    Intercept(); //start the process to listen for collected checkpoints
+    MLHook::RegisterMLHook(ClipHook(), "RaceMenuEvent_InvokeMedalClip", true); // make a hook to catch medal clip events
+
     while (true) {
         auto app = GetApp();
         if (app is null) {
@@ -46,18 +47,22 @@ void Main() {
             if (map !is null) {
                 currentMapId = map.EdChallengeId; // get the map the player is on 
                 if (currentMapId != lastMapId) {
-                    print("Switched to new map: " + currentMapId);
+                    if (!intercepting) {
+                        Intercept(); //start the process to listen for collected checkpoints
+                    }
+                    trace("Switched to new map: " + currentMapId);
                     lastMapId = currentMapId;
                     checkpointCount = GetCheckpointCount(); // get how many checkpoints are in the map
-                    print("This map has " + checkpointCount + " checkpoints");
                     hasFinished = false;
 
                     CGamePlayerInfo@ profile = app.LocalPlayerInfo;
                     playerId = profile.IdName;
                     playerName = profile.Name;
-                    // can find profile at https://trackmania.io/#/player/{IdName}
+                    // can find profile at https://trackmania.io/#/player/{playerId}
 
                     NetStuff('http://localhost:12665/api/v1/context/submit', '{"localPlayer": {"playerId": "' + playerId + '", "playerName": "' + playerName + '"}, "globalContextData":{"mapID": "' + currentMapId + '"}}'); // let medal know the user switched maps 
+
+                    loadMenu(); // load the medal button in to the ui
                 }
             }
         }
@@ -65,6 +70,22 @@ void Main() {
         yield();
     }
 }
+
+// handles user clicking clip button in game
+uint ticksSinceClip = 0; // block user from spamming loads of clips at once, only allow one every 3 seconds or so
+class ClipHook : MLHook::HookMLEventsByType {
+    ClipHook() {
+        super("RaceMenuEvent_InvokeMedalClip");
+    }
+
+    void OnEvent(MLHook::PendingEvent@ event) override {
+        if (ticksSinceClip > 180) {
+            print("Saving clip with Medal");
+            ticksSinceClip = 0;
+        }
+    }
+}
+
 
 void Update(float dt) {
 
@@ -92,11 +113,11 @@ void Update(float dt) {
 
     if (!trackStart) {
         if (GetRunningTime() == 0) {
-            print("Race has started!");
             hasFinished = false;
             checkpoints = 0;
             isPlayerAFK = false;
             framesAFK = 0;
+            ticksSinceClip = 250; // allowing the user to clip asap once the race is over
             NetStuff('http://localhost:12665/api/v1/event/invoke', '{"eventId": "race_start", "eventName": "Race Started"}');
             // if API functionality is added, this is where the call is made to start recording
         }
@@ -109,7 +130,7 @@ void Update(float dt) {
         uint minutes = lastCheckpointTime / 60000;
         uint seconds = (lastCheckpointTime % 60000) / 1000;
         uint milliseconds = lastCheckpointTime % 1000;
-        print("Track finished at " + minutes + ":" + seconds + "." + milliseconds);
+        trace("Track finished at " + minutes + ":" + seconds + "." + milliseconds);
         hasFinished = true;
         NetStuff('http://localhost:12665/api/v1/event/invoke', '{"eventId": "race_finish", "eventName": "Race Finished"}');
         // if API functionality is added, this is where the call is made to stop recording
@@ -124,19 +145,75 @@ void Update(float dt) {
         if (isPlayerAFK && speed > 2) {
             isPlayerAFK = false;
             framesAFK = 0;
-            print("Player returned from AFK");
+            trace("Player returned from AFK");
             NetStuff('http://localhost:12665/api/v1/event/invoke', '{"eventId": "afk_return", "eventName": "Returned from AFK"}');
-            // make call to resume recording
+            // if API functionality is added, this is where the call is made to resume recording
         } else if (speed < 2) { framesAFK += 1; }
 
         // 15ish seconds at 60fps
         if (framesAFK > 60*15 && !isPlayerAFK) { 
             isPlayerAFK = true;
-            print("Player went AFK");
+            trace("Player went AFK");
             NetStuff('http://localhost:12665/api/v1/event/invoke', '{"eventId": "afk_start", "eventName": "Went AFK"}');
-            // make call to stop recording
+            // if API functionality is added, this is where the call is made to stop recording
         }
     }
+
+    if (hasFinished) {
+        ticksSinceClip += 1;
+    }
+}
+
+void loadMenu() {
+    CTrackMania@ App = cast<CTrackMania@>(GetApp());
+    CTrackManiaNetwork@ Network = cast<CTrackManiaNetwork@>(App.Network);
+    CGameManiaAppPlayground@ CMAP = Network.ClientManiaAppPlayground;
+
+    if (CMAP !is null && CMAP.UILayers.Length > 1) {
+
+        for (int i = CMAP.UILayers.Length - 1; i >= 0; i--) {
+            CGameUILayer@ Layer = CMAP.UILayers[i];
+            if (Layer is null)
+                continue;
+
+            if (string(Layer.ManialinkPage).Trim().SubStr(0, 50).Contains("_PauseMenu")) {
+                // add our button
+                string pat = '<frameinstance\n				modelid="component-trackmania-button" id="button-restart"\n				class="component-navigation-item component-menusounds-item component-grid-element"\n				data-grid-row="1"\n				data-text="Change opponents"\n				data-size="125. 10.6952"\n				data-textcolor="6EFAA0"\n				data-textfocuscolor="003228"\n				data-image="file://Media/Manialinks/Nadeo/TMGame/Menus/HUD_Campaign_Button_ObtuseCorner.dds"\n				data-imagefocus="file://Media/Manialinks/Nadeo/TMGame/Menus/HUD_Campaign_Button_ObtuseCorner_Focused.dds"\n				data-backgroundcolortype="0"\n				data-textfont="GameFontExtraBold"\n				data-opacityunfocus=".9"\n				data-textsize="4"\n				data-textopacityunfocus=".4"\n				data-textitalicslope=".2"\n				data-halign="center" data-valign="center"\n				data-nav-inputs="select;cancel;appmenu;up;down;right;pageup;pagedown"\n				data-nav-targets="_;_;_;button-resume;button-favorite-map;frame-maniapubs;_;_"\n				data-nav-group="navgroup-campaign-pausemenu-default"\n				data-nav-zone="ComponentTrackmania_Button_quad-background"\n				z-index="2"\n				data-menusounds-selectsound="IngameSelectChangeOpponent"\n			/>';
+                
+                string replace = '<frameinstance\n				modelid="component-trackmania-button" id="button-clip"\n				class="component-navigation-item component-menusounds-item component-grid-element"\n				data-grid-row="1"\n				data-text="Clip"\n				data-size="125. 10.6952"\n				data-textcolor="6EFAA0"\n				data-textfocuscolor="003228"\n				data-image="file://Media/Manialinks/Nadeo/TMGame/Menus/HUD_Campaign_Button_ObtuseCorner.dds"\n				data-imagefocus="file://Media/Manialinks/Nadeo/TMGame/Menus/HUD_Campaign_Button_ObtuseCorner_Focused.dds"\n				data-backgroundcolortype="0"\n				data-textfont="GameFontExtraBold"\n				data-opacityunfocus=".9"\n				data-textitalicslope=".2"\n				data-textsize="4"\n				data-textopacityunfocus=".4"\n				data-halign="center" data-valign="center"\n				data-nav-inputs="select;cancel;appmenu;up;down;right;pageup;pagedown"\n				data-nav-targets="_;_;_;button-resume;button-restart;frame-maniapubs;_;_"\n				data-nav-group="navgroup-campaign-pausemenu-default"\n				data-nav-zone="ComponentTrackmania_Button_quad-background"\n				z-index="2"\n				data-menusounds-selectsound="IngameSelectStartRace"\n			/>\n			<frameinstance\n				modelid="component-trackmania-button" id="button-restart"\n				class="component-navigation-item component-menusounds-item component-grid-element"\n				data-grid-row="2"\n				data-text="Change opponents"\n				data-size="125. 10.6952"\n				data-textcolor="6EFAA0"\n				data-textfocuscolor="003228"\n				data-image="file://Media/Manialinks/Nadeo/TMGame/Menus/HUD_Campaign_Button_ObtuseCorner.dds"\n				data-imagefocus="file://Media/Manialinks/Nadeo/TMGame/Menus/HUD_Campaign_Button_ObtuseCorner_Focused.dds"\n				data-backgroundcolortype="0"\n				data-textfont="GameFontExtraBold"\n				data-opacityunfocus=".9"\n				data-textsize="4"\n				data-textopacityunfocus=".4"\n				data-textitalicslope=".2"\n				data-halign="center" data-valign="center"\n				data-nav-inputs="select;cancel;appmenu;up;down;right;pageup;pagedown"\n				data-nav-targets="_;_;_;button-clip;button-favorite-map;frame-maniapubs;_;_"\n				data-nav-group="navgroup-campaign-pausemenu-default"\n				data-nav-zone="ComponentTrackmania_Button_quad-background"\n				z-index="2"\n				data-menusounds-selectsound="IngameSelectChangeOpponent"\n			/>';
+
+                Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPage, 'data-nav-targets="_;_;_;button-exit;button-restart;frame-maniapubs;_;_"', 'data-nav-targets="_;_;_;button-exit;button-clip;frame-maniapubs;_;_"');
+
+                Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPage, pat, replace, Regex::Flags::ECMAScript);
+
+                // since all buttons have an index move back all buttons that come after
+                Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPage, '			<frame id="frame-favorite-map" class="component-grid-element" data-grid-row="2">', '			<frame id="frame-favorite-map" class="component-grid-element" data-grid-row="3">');
+                
+                Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPage, '				modelid="component-trackmania-button" id="button-scorestable"\n				class="component-navigation-item component-menusounds-item component-grid-element"\n				data-grid-row="3"', '				modelid="component-trackmania-button" id="button-scorestable"\n				class="component-navigation-item component-menusounds-item component-grid-element"\n				data-grid-row="4"');
+                
+                Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPageUtf8, 'modelid="component-trackmania-button" id="button-records"\n				class="component-navigation-item component-menusounds-item component-grid-element"\n				data-grid-row="4"', 'modelid="component-trackmania-button" id="button-records"\n				class="component-navigation-item component-menusounds-item component-grid-element"\n				data-grid-row="5"');
+
+                Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPage, 'modelid="component-trackmania-button" id="button-settings"\n				class="component-navigation-item component-menusounds-item component-grid-element"\n				data-grid-row="5"', 'modelid="component-trackmania-button" id="button-settings"\n				class="component-navigation-item component-menusounds-item component-grid-element"\n				data-grid-row="6"');
+
+                Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPage, 'modelid="component-trackmania-button" id="button-report"\n				class="component-navigation-item component-menusounds-item component-grid-element"\n				data-grid-row="6"', 'modelid="component-trackmania-button" id="button-report"\n				class="component-navigation-item component-menusounds-item component-grid-element"\n				data-grid-row="7"');
+
+                Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPage, 'modelid="component-trackmania-button" id="button-ubi-connect"\n				class="component-navigation-item component-menusounds-item component-grid-element"\n				data-grid-row="7"', 'modelid="component-trackmania-button" id="button-ubi-connect"\n				class="component-navigation-item component-menusounds-item component-grid-element"\n				data-grid-row="8"');
+
+                Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPage, '<frame id="frame-footer" class="component-grid-element" data-grid-row="9">', '<frame id="frame-footer" class="component-grid-element" data-grid-row="9">');
+
+
+                // add an event to be invoked when our button is clicked
+                string before = 'case "button-resume": CloseInGameMenu(CMlScriptIngame::EInGameMenuResult::Resume);';
+                string after = 'case "button-resume": CloseInGameMenu(CMlScriptIngame::EInGameMenuResult::Resume);\n		case "button-clip": {\n			SendCustomEvent("RaceMenuEvent_InvokeMedalClip", []);\n			CloseInGameMenu(CMlScriptIngame::EInGameMenuResult::Resume);\n		}';
+                before = EscapeRegex(before);
+
+                Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPage, before, after);
+
+                break;
+            }
+        }
+    } else
+        warn("CMAP error");
 }
 
 bool trackStart = true; // has the race started
@@ -163,7 +240,7 @@ void Intercept() {
     if (GetApp().CurrentPlayground is null)
         return;
 
-    trace("Intercept starting for \"LayerCustomEvent\"");
+    trace("Medal started intercepting checkpoint events");
 
     try {
         Dev::InterceptProc("CGameManiaApp", "LayerCustomEvent", _Intercept);
@@ -197,7 +274,7 @@ void CaptureEvent(const string &in type, MwFastBuffer<wstring> &in data) {
             wasFinish = false;
         }
         if (!wasFinish) {
-            print("Hit checkpoint #" + checkpoints + " at " + minutes + ":" + seconds + "." + milliseconds);
+            trace("Hit checkpoint #" + checkpoints + " at " + minutes + ":" + seconds + "." + milliseconds);
         }
         // this is only accurate to 2 decimals, instead of trackmanias recorded accuracy of 3 decimals
 
@@ -288,4 +365,23 @@ class Request {
         }
         //print(req.String());
     }
+}
+
+string EscapeRegex(string s) {
+	return s
+		.Replace(".", "\\.")
+		.Replace("(", "\\(")
+		.Replace(")", "\\)")
+		.Replace("[", "\\[")
+		.Replace("]", "\\]")
+		.Replace("{", "\\{")
+		.Replace("}", "\\}");
+}
+
+// when script is closed make sure to remove any hooks we left
+void OnDestroyed() { _Unload(); }
+void OnDisabled() { _Unload(); }
+void _Unload() {
+    trace('_Unload, unloading all hooks and removing all injected ML');
+    MLHook::UnregisterMLHooksAndRemoveInjectedML();
 }

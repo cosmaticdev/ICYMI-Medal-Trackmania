@@ -6,4 +6,4 @@ category    = "clipping"
 version = "1.0"
 
 [script]
-dependencies = [ "VehicleState" ]
+dependencies = [ "VehicleState", "MLHook" ]
