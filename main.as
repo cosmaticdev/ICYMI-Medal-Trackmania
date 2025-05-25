@@ -72,16 +72,16 @@ void Main() {
 }
 
 // handles user clicking clip button in game
-uint ticksSinceClip = 0; // block user from spamming loads of clips at once, only allow one every 3 seconds or so
+uint timeSinceClipMS = 0; // block user from spamming loads of clips at once, only allow one every 3 seconds or so
 class ClipHook : MLHook::HookMLEventsByType {
     ClipHook() {
         super("RaceMenuEvent_InvokeMedalClip");
     }
 
     void OnEvent(MLHook::PendingEvent@ event) override {
-        if (ticksSinceClip > 180) {
+        if (timeSinceClipMS > 3000) {
             print("Saving clip with Medal");
-            ticksSinceClip = 0;
+            timeSinceClipMS = 0;
         }
     }
 }
@@ -110,14 +110,16 @@ void Update(float dt) {
         trackStart = false;
     }
 
+    if (app.Viewport.AverageFps <= 0.0f)
+        return;
 
     if (!trackStart) {
         if (GetRunningTime() == 0) {
             hasFinished = false;
             checkpoints = 0;
             isPlayerAFK = false;
-            framesAFK = 0;
-            ticksSinceClip = 250; // allowing the user to clip asap once the race is over
+            AFKTimeMS = 0;
+            timeSinceClipMS = 99999; // allowing the user to clip asap once the race is over
             NetStuff('http://localhost:12665/api/v1/event/invoke', '{"eventId": "race_start", "eventName": "Race Started"}');
             // if API functionality is added, this is where the call is made to start recording
         }
@@ -142,16 +144,18 @@ void Update(float dt) {
     
     if (!hasFinished) {
         float speed = visState.WorldVel.Length() * 3.6;
-        if (isPlayerAFK && speed > 2) {
+        if (isPlayerAFK && speed > 5) {
             isPlayerAFK = false;
-            framesAFK = 0;
+            AFKTimeMS = 0;
             trace("Player returned from AFK");
             NetStuff('http://localhost:12665/api/v1/event/invoke', '{"eventId": "afk_return", "eventName": "Returned from AFK"}');
             // if API functionality is added, this is where the call is made to resume recording
-        } else if (speed < 2) { framesAFK += 1; }
+        } else if (speed < 5 && !isPlayerAFK) {
+            AFKTimeMS += int(1000.0f / app.Viewport.AverageFps);
+        }
 
-        // 15ish seconds at 60fps
-        if (framesAFK > 60*15 && !isPlayerAFK) { 
+        // 1500ms = 15s
+        if (AFKTimeMS >= 15000 && !isPlayerAFK) { 
             isPlayerAFK = true;
             trace("Player went AFK");
             NetStuff('http://localhost:12665/api/v1/event/invoke', '{"eventId": "afk_start", "eventName": "Went AFK"}');
@@ -160,7 +164,7 @@ void Update(float dt) {
     }
 
     if (hasFinished) {
-        ticksSinceClip += 1;
+        timeSinceClipMS += int(1000.0f / app.Viewport.AverageFps);
     }
 }
 
@@ -228,7 +232,7 @@ string currentMapId = ""; // what map are we playing right now
 string playerId = "";
 string playerName = "";
 bool isPlayerAFK = false;
-uint framesAFK = 0;
+uint AFKTimeMS  = 0;
 
 // watches the checkpoints to see if we've crossed any of them
 void Intercept() {
