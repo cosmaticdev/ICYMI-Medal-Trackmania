@@ -3,7 +3,7 @@ void Main() {
     while (true) {
 
         // ping medal's local port
-        Request@ req = Request('http://localhost:12665/api/v1/context/submit', '', {});
+        Request@ req = Request('http://localhost:12665/api/v1/event/invoke', '{"eventId": "plugin_start", "eventName": "Plugin Started"}');
 
         trace('Waiting for Medal...');
         sleep(1000);
@@ -176,7 +176,6 @@ void loadMenu() {
                 continue;
 
             if (string(Layer.ManialinkPage).Trim().SubStr(0, 50).Contains("_EndRaceMenu")) {
-                print("Found end UI at " + i);
                 // add our button
                 Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPage, 'data-nav-targets="_;_;_;button-next-map;button-challenge;_;_"\n					data-nav-group="navgroup-endracemenu-default"\n					data-nav-zone="ComponentTrackmania_Button_quad-background"\n					data-menusounds-selectsound="IngameSelectStartRace"\n				/>', 'data-nav-targets="_;_;_;button-next-map;button-clip;_;_"\n					data-nav-group="navgroup-endracemenu-default"\n					data-nav-zone="ComponentTrackmania_Button_quad-background"\n					data-menusounds-selectsound="IngameSelectStartRace"\n				/>\n                <frameinstance\n					modelid="component-trackmania-button" id="button-clip"\n					class="component-navigation-item component-menusounds-item component-grid-element"\n					data-grid-row="1"\n					data-opacityunfocus=".9"\n					data-size="125. 10.6952"\n					data-labelsize="90. 10.6952"\n					data-backgroundcolortype="0"\n					data-image="file://Media/Manialinks/Nadeo/TMGame/Menus/HUD_Campaign_Button_ObtuseCorner.dds"\n					data-imagefocus="file://Media/Manialinks/Nadeo/TMGame/Menus/HUD_Campaign_Button_ObtuseCorner_Focused.dds"\n					data-iconsize="7.69519 7.69519"\n					data-iconcolortype="0"\n					data-iconxpos=".9" data-iconypos="-.49"\n					data-text="Clip with Medal"\n					data-textopacityunfocus=".4"\n					data-textsize="4"\n					data-fitlabel="2."\n					data-textitalicslope=".2"\n					data-textfont="GameFontExtraBold"\n					data-textcolor="6EFAA0"\n					data-textfocuscolor="003228"\n					data-halign="center" data-valign="center"\n					data-nav-inputs="select;cancel;action2;up;down;pageup;pagedown"\n					data-nav-targets="_;_;_;button-improve;button-challenge;_;_"\n					data-nav-group="navgroup-endracemenu-default"\n					data-nav-zone="ComponentTrackmania_Button_quad-background"\n					data-menusounds-selectsound="IngameSelectStartRace"\n					hidden="0"\n				/>');
 
@@ -222,6 +221,9 @@ string playerId = "";
 string playerName = "";
 bool isPlayerAFK = false;
 uint AFKTimeMS  = 0;
+
+// define medal public key
+string publicKey = "pub_9n8c5rHz0c2oYCPmnU27Hmr2y3MSOySo"; // medal public key
 
 // watches the checkpoints to see if we've crossed any of them
 void Intercept() {
@@ -329,24 +331,20 @@ uint GetCheckpointCount() {
 
 // used for sending post requests to medal
 void NetStuff(string url, string payload) {
-    // Define headers
-    dictionary headers = {
-        {"publicKey", "pub_fkwjWOeMfGHeGXHI8wNYwg1lkTcTAflk"} // medal public key
-    };
-
     // Send request
-    Request@ req = Request(url, payload, headers);
+    Request@ req = Request(url, payload);
 }
 
 class Request {
     Net::HttpRequest@ req;
 
-    Request(const string &in url, const string &in body, dictionary@ headers) {
+    Request(const string &in url, const string &in body) {
         @req = Net::HttpRequest();
         req.Method = Net::HttpMethod::Post; // Set HTTP method to POST
         req.Url = url;
         req.Body = body;
-        req.Headers = headers;
+        req.Headers["Content-Type"] = "application/json";
+        req.Headers["publicKey"] = publicKey;
 
         req.Start(); // Send the request
         startnew(CoroutineFunc(this.run));
@@ -356,7 +354,6 @@ class Request {
         while (!this.req.Finished()) {
             yield();
         }
-        //print(req.String());
     }
 }
 
