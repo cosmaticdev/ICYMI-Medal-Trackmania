@@ -1,8 +1,3 @@
-// thank you to the following for contributing a portion of the following script
-// https://github.com/Phlarx/tm-checkpoint-counter
-// https://github.com/ezio416/tm-current-effects
-// https://github.com/RuurdBijlsma/tm-split-speeds
-
 void Main() {
     // allow the program to check for medal until a connection can be made
     while (true) {

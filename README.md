@@ -14,3 +14,9 @@ The end goal is for this data to be used to allow for Medal to make clip lengths
 Planned features for a future release:
 - support for older trackmania games
 - menu option to save clips
+
+Thank you to the following for contributing a portion of the following script
+- https://github.com/Phlarx/tm-checkpoint-counter
+- https://github.com/ezio416/tm-current-effects
+- https://github.com/RuurdBijlsma/tm-split-speeds
+- https://github.com/openplanet-nl/mlhook
