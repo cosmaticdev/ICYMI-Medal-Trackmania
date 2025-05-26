@@ -39,7 +39,7 @@ void Main() {
 			|| playground.Map is null
 			|| playground.GameTerminals.Length <= 0
 			|| playground.GameTerminals[0].UISequence_Current != CGamePlaygroundUIConfig::EUISequence::Playing
-			|| cast<CSmPlayer>(playground.GameTerminals[0].GUIPlayer) is null) {
+			|| cast<CSmPlayer>(playground.GameTerminals[0].GUIPlayer) is null) { lastMapId = "";
 		} else {
 
             CGameCtnChallenge@ map = app.RootMap;
@@ -61,9 +61,10 @@ void Main() {
                     // can find profile at https://trackmania.io/#/player/{playerId}
 
                     NetStuff('http://localhost:12665/api/v1/context/submit', '{"localPlayer": {"playerId": "' + playerId + '", "playerName": "' + playerName + '"}, "globalContextData":{"mapID": "' + currentMapId + '"}}'); // let medal know the user switched maps 
-
                     loadMenu(); // load the medal button in to the ui
                 }
+            } else {
+                lastMapId = "";
             }
         }
 
@@ -90,9 +91,8 @@ class ClipHook : MLHook::HookMLEventsByType {
 void Update(float dt) {
 
     CGameCtnApp@ app = GetApp();
-    if (app is null || app.CurrentPlayground is null) return;
     CGamePlayground@ playground = cast<CGamePlayground>(app.CurrentPlayground);
-    if (playground is null) return;
+    if (playground == null) { return; }
 
     // Detect the player starting a race 
     try {
@@ -180,34 +180,28 @@ void loadMenu() {
             if (Layer is null)
                 continue;
 
-            if (string(Layer.ManialinkPage).Trim().SubStr(0, 50).Contains("_PauseMenu")) {
+            if (string(Layer.ManialinkPage).Trim().SubStr(0, 50).Contains("_EndRaceMenu")) {
+                print("Found end UI at " + i);
                 // add our button
-                string pat = '<frameinstance\n				modelid="component-trackmania-button" id="button-restart"\n				class="component-navigation-item component-menusounds-item component-grid-element"\n				data-grid-row="1"\n				data-text="Change opponents"\n				data-size="125. 10.6952"\n				data-textcolor="6EFAA0"\n				data-textfocuscolor="003228"\n				data-image="file://Media/Manialinks/Nadeo/TMGame/Menus/HUD_Campaign_Button_ObtuseCorner.dds"\n				data-imagefocus="file://Media/Manialinks/Nadeo/TMGame/Menus/HUD_Campaign_Button_ObtuseCorner_Focused.dds"\n				data-backgroundcolortype="0"\n				data-textfont="GameFontExtraBold"\n				data-opacityunfocus=".9"\n				data-textsize="4"\n				data-textopacityunfocus=".4"\n				data-textitalicslope=".2"\n				data-halign="center" data-valign="center"\n				data-nav-inputs="select;cancel;appmenu;up;down;right;pageup;pagedown"\n				data-nav-targets="_;_;_;button-resume;button-favorite-map;frame-maniapubs;_;_"\n				data-nav-group="navgroup-campaign-pausemenu-default"\n				data-nav-zone="ComponentTrackmania_Button_quad-background"\n				z-index="2"\n				data-menusounds-selectsound="IngameSelectChangeOpponent"\n			/>';
-                
-                string replace = '<frameinstance\n				modelid="component-trackmania-button" id="button-clip"\n				class="component-navigation-item component-menusounds-item component-grid-element"\n				data-grid-row="1"\n				data-text="Clip"\n				data-size="125. 10.6952"\n				data-textcolor="6EFAA0"\n				data-textfocuscolor="003228"\n				data-image="file://Media/Manialinks/Nadeo/TMGame/Menus/HUD_Campaign_Button_ObtuseCorner.dds"\n				data-imagefocus="file://Media/Manialinks/Nadeo/TMGame/Menus/HUD_Campaign_Button_ObtuseCorner_Focused.dds"\n				data-backgroundcolortype="0"\n				data-textfont="GameFontExtraBold"\n				data-opacityunfocus=".9"\n				data-textitalicslope=".2"\n				data-textsize="4"\n				data-textopacityunfocus=".4"\n				data-halign="center" data-valign="center"\n				data-nav-inputs="select;cancel;appmenu;up;down;right;pageup;pagedown"\n				data-nav-targets="_;_;_;button-resume;button-restart;frame-maniapubs;_;_"\n				data-nav-group="navgroup-campaign-pausemenu-default"\n				data-nav-zone="ComponentTrackmania_Button_quad-background"\n				z-index="2"\n				data-menusounds-selectsound="IngameSelectStartRace"\n			/>\n			<frameinstance\n				modelid="component-trackmania-button" id="button-restart"\n				class="component-navigation-item component-menusounds-item component-grid-element"\n				data-grid-row="2"\n				data-text="Change opponents"\n				data-size="125. 10.6952"\n				data-textcolor="6EFAA0"\n				data-textfocuscolor="003228"\n				data-image="file://Media/Manialinks/Nadeo/TMGame/Menus/HUD_Campaign_Button_ObtuseCorner.dds"\n				data-imagefocus="file://Media/Manialinks/Nadeo/TMGame/Menus/HUD_Campaign_Button_ObtuseCorner_Focused.dds"\n				data-backgroundcolortype="0"\n				data-textfont="GameFontExtraBold"\n				data-opacityunfocus=".9"\n				data-textsize="4"\n				data-textopacityunfocus=".4"\n				data-textitalicslope=".2"\n				data-halign="center" data-valign="center"\n				data-nav-inputs="select;cancel;appmenu;up;down;right;pageup;pagedown"\n				data-nav-targets="_;_;_;button-clip;button-favorite-map;frame-maniapubs;_;_"\n				data-nav-group="navgroup-campaign-pausemenu-default"\n				data-nav-zone="ComponentTrackmania_Button_quad-background"\n				z-index="2"\n				data-menusounds-selectsound="IngameSelectChangeOpponent"\n			/>';
+                Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPage, 'data-nav-targets="_;_;_;button-next-map;button-challenge;_;_"\n					data-nav-group="navgroup-endracemenu-default"\n					data-nav-zone="ComponentTrackmania_Button_quad-background"\n					data-menusounds-selectsound="IngameSelectStartRace"\n				/>', 'data-nav-targets="_;_;_;button-next-map;button-clip;_;_"\n					data-nav-group="navgroup-endracemenu-default"\n					data-nav-zone="ComponentTrackmania_Button_quad-background"\n					data-menusounds-selectsound="IngameSelectStartRace"\n				/>\n                <frameinstance\n					modelid="component-trackmania-button" id="button-clip"\n					class="component-navigation-item component-menusounds-item component-grid-element"\n					data-grid-row="1"\n					data-opacityunfocus=".9"\n					data-size="125. 10.6952"\n					data-labelsize="90. 10.6952"\n					data-backgroundcolortype="0"\n					data-image="file://Media/Manialinks/Nadeo/TMGame/Menus/HUD_Campaign_Button_ObtuseCorner.dds"\n					data-imagefocus="file://Media/Manialinks/Nadeo/TMGame/Menus/HUD_Campaign_Button_ObtuseCorner_Focused.dds"\n					data-iconsize="7.69519 7.69519"\n					data-iconcolortype="0"\n					data-iconxpos=".9" data-iconypos="-.49"\n					data-text="Clip with Medal"\n					data-textopacityunfocus=".4"\n					data-textsize="4"\n					data-fitlabel="2."\n					data-textitalicslope=".2"\n					data-textfont="GameFontExtraBold"\n					data-textcolor="6EFAA0"\n					data-textfocuscolor="003228"\n					data-halign="center" data-valign="center"\n					data-nav-inputs="select;cancel;action2;up;down;pageup;pagedown"\n					data-nav-targets="_;_;_;button-improve;button-challenge;_;_"\n					data-nav-group="navgroup-endracemenu-default"\n					data-nav-zone="ComponentTrackmania_Button_quad-background"\n					data-menusounds-selectsound="IngameSelectStartRace"\n					hidden="0"\n				/>');
 
-                Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPage, 'data-nav-targets="_;_;_;button-exit;button-restart;frame-maniapubs;_;_"', 'data-nav-targets="_;_;_;button-exit;button-clip;frame-maniapubs;_;_"');
+                // fix the offset this makes
 
-                Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPage, pat, replace, Regex::Flags::ECMAScript);
+                Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPage, 'modelid="component-trackmania-button" id="button-challenge"\n					class="component-navigation-item component-menusounds-item component-grid-element"\n					data-grid-row="1"', 'modelid="component-trackmania-button" id="button-challenge"\n					class="component-navigation-item component-menusounds-item component-grid-element"\n					data-grid-row="2"');
+                Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPage, 'data-nav-targets="_;_;_;button-improve;button-opponents;_;_"', 'data-nav-targets="_;_;_;button-clip;button-opponents;_;_"');
 
-                // since all buttons have an index move back all buttons that come after
-                Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPage, '			<frame id="frame-favorite-map" class="component-grid-element" data-grid-row="2">', '			<frame id="frame-favorite-map" class="component-grid-element" data-grid-row="3">');
-                
-                Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPage, '				modelid="component-trackmania-button" id="button-scorestable"\n				class="component-navigation-item component-menusounds-item component-grid-element"\n				data-grid-row="3"', '				modelid="component-trackmania-button" id="button-scorestable"\n				class="component-navigation-item component-menusounds-item component-grid-element"\n				data-grid-row="4"');
-                
-                Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPageUtf8, 'modelid="component-trackmania-button" id="button-records"\n				class="component-navigation-item component-menusounds-item component-grid-element"\n				data-grid-row="4"', 'modelid="component-trackmania-button" id="button-records"\n				class="component-navigation-item component-menusounds-item component-grid-element"\n				data-grid-row="5"');
+                Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPage, 'modelid="component-trackmania-button" id="button-opponents" z-index="1"\n					class="component-navigation-item component-menusounds-item component-grid-element"\n					data-grid-row="2"', 'modelid="component-trackmania-button" id="button-opponents" z-index="1"\n					class="component-navigation-item component-menusounds-item component-grid-element"\n					data-grid-row="3"');
 
-                Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPage, 'modelid="component-trackmania-button" id="button-settings"\n				class="component-navigation-item component-menusounds-item component-grid-element"\n				data-grid-row="5"', 'modelid="component-trackmania-button" id="button-settings"\n				class="component-navigation-item component-menusounds-item component-grid-element"\n				data-grid-row="6"');
+                Layer.ManialinkPage  = Regex::Replace(Layer.ManialinkPage, 'modelid="component-trackmania-button" id="button-replay" z-index="2"\n					class="component-navigation-item component-menusounds-item component-grid-element"\n					data-grid-row="3"', 'modelid="component-trackmania-button" id="button-replay" z-index="2"\n					class="component-navigation-item component-menusounds-item component-grid-element"\n					data-grid-row="4"');
 
-                Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPage, 'modelid="component-trackmania-button" id="button-report"\n				class="component-navigation-item component-menusounds-item component-grid-element"\n				data-grid-row="6"', 'modelid="component-trackmania-button" id="button-report"\n				class="component-navigation-item component-menusounds-item component-grid-element"\n				data-grid-row="7"');
+                Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPage, 'Trackmania_Button::SetVisibilityAndNavigation(_State.Controls.Button_Challenge, _State.MedalghostVisibility);', 'Trackmania_Button::SetVisibilityAndNavigation(_State.Controls.Button_Challenge, _State.MedalghostVisibility);\n	Trackmania_Button::SetVisibilityAndNavigation(_State.Controls.Button_Clip, True);');
 
-                Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPage, 'modelid="component-trackmania-button" id="button-ubi-connect"\n				class="component-navigation-item component-menusounds-item component-grid-element"\n				data-grid-row="7"', 'modelid="component-trackmania-button" id="button-ubi-connect"\n				class="component-navigation-item component-menusounds-item component-grid-element"\n				data-grid-row="8"');
+                Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPage, 'Button_Improve = (Frame_Global.GetFirstChild("button-improve") as CMlFrame),', 'Button_Improve = (Frame_Global.GetFirstChild("button-improve") as CMlFrame),\n		Button_Clip = (Frame_Global.GetFirstChild("button-clip") as CMlFrame),');
 
-                Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPage, '<frame id="frame-footer" class="component-grid-element" data-grid-row="9">', '<frame id="frame-footer" class="component-grid-element" data-grid-row="9">');
-
+                Layer.ManialinkPage = Regex::Replace(Layer.ManialinkPage, 'CMlFrame Button_Improve;', 'CMlFrame Button_Improve;\n	CMlFrame Button_Clip;');
 
                 // add an event to be invoked when our button is clicked
-                string before = 'case "button-resume": CloseInGameMenu(CMlScriptIngame::EInGameMenuResult::Resume);';
+                string before = 'case "button-improve": SendCustomEvent("EndRaceMenuEvent_Improve", []);';
                 string after = 'case "button-resume": CloseInGameMenu(CMlScriptIngame::EInGameMenuResult::Resume);\n		case "button-clip": {\n			SendCustomEvent("RaceMenuEvent_InvokeMedalClip", []);\n			CloseInGameMenu(CMlScriptIngame::EInGameMenuResult::Resume);\n		}';
                 before = EscapeRegex(before);
 
