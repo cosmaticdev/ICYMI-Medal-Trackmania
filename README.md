@@ -2,6 +2,8 @@ Trackmania Openplanet plugin aimed to allow Medal to contextualize gameplay data
 
 This could possibly allow for enhanced race clipping and/or ICYMI support for Trackmania
 
+*The [MLHook Plugin](https://openplanet.dev/plugin/mlhook) is required for this plugin to function*
+
 This plugin records the following:
 - maps being played
 - trackmania username for the active user
